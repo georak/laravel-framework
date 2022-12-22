@@ -136,6 +136,18 @@ class Worker
         [$startTime, $jobsProcessed] = [hrtime(true) / 1e9, 0];
 
         while (true) {
+
+            // We will check to see if the queue should restart based on other
+            // indications. If so, we'll stop this worker and let whatever
+            // is "monitoring" it restart the process.
+            $status = $this->forceStopIfNecessary(
+                $options, $lastRestart, $startTime
+            );
+
+            if (! is_null($status)) {
+                return $this->stop($status, $options);
+            }
+
             // Before reserving any jobs, we will make sure this queue is not paused and
             // if it is we will just pause this worker for a given amount of time and
             // make sure we do not need to kill this worker process off completely.
@@ -297,10 +309,27 @@ class Worker
         return match (true) {
             $this->shouldQuit => static::EXIT_SUCCESS,
             $this->memoryExceeded($options->memory) => static::EXIT_MEMORY_LIMIT,
-            $this->queueShouldRestart($lastRestart) => static::EXIT_SUCCESS,
             $options->stopWhenEmpty && is_null($job) => static::EXIT_SUCCESS,
-            $options->maxTime && hrtime(true) / 1e9 - $startTime >= $options->maxTime => static::EXIT_SUCCESS,
             $options->maxJobs && $jobsProcessed >= $options->maxJobs => static::EXIT_SUCCESS,
+            default => null
+        };
+    }
+
+    /**
+     * Determine the exit code to stop the process if necessary.
+     *
+     * @param  \Illuminate\Queue\WorkerOptions  $options
+     * @param  int  $lastRestart
+     * @param  int  $startTime
+     * @param  int  $jobsProcessed
+     * @param  mixed  $job
+     * @return int|null
+     */
+    protected function forceStopIfNecessary(WorkerOptions $options, $lastRestart, $startTime = 0)
+    {
+        return match (true) {
+            $this->queueShouldRestart($lastRestart) => static::EXIT_SUCCESS,
+            $options->maxTime && hrtime(true) / 1e9 - $startTime >= $options->maxTime => static::EXIT_SUCCESS,
             default => null
         };
     }

@@ -107,9 +107,9 @@ class WorkCommandTest extends TestCase
 
     public function testMaxTimeExceeded()
     {
-        Queue::connection('database')->push(new ThirdJob);
         Queue::connection('database')->push(new FirstJob);
         Queue::connection('database')->push(new SecondJob);
+        Queue::connection('database')->push(new ThirdJob);
 
         $this->artisan('queue:work', [
             'connection' => 'database',
@@ -120,9 +120,9 @@ class WorkCommandTest extends TestCase
 
         // Memory limit isn't checked until after the first job is attempted.
         $this->assertSame(2, Queue::connection('database')->size());
-        $this->assertTrue(ThirdJob::$ran);
-        $this->assertFalse(FirstJob::$ran);
+        $this->assertTrue(FirstJob::$ran);
         $this->assertFalse(SecondJob::$ran);
+        $this->assertFalse(ThirdJob::$ran);
     }
 }
 
